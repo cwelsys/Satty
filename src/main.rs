@@ -116,6 +116,14 @@ impl App {
         let image_width = (self.image_dimensions.0 as f32 / scale) as f64;
         let image_height = (self.image_dimensions.1 as f32 / scale) as f64;
 
+        // The toolbars share the window height with the canvas, so ask for the
+        // image height plus theirs to get a canvas the size of the image.
+        let natural_height = |widget: &gtk::Widget| -> f64 {
+            widget.measure(gtk::Orientation::Vertical, -1).1 as f64
+        };
+        let toolbars_height = natural_height(self.tools_toolbar.widget().upcast_ref())
+            + natural_height(self.style_toolbar.widget().upcast_ref());
+
         eprintln!(
             "Fullscreen {:?} | Resize {:?} | Floatinghack {:?}",
             fullscreen, resize, floating_hack
@@ -139,7 +147,7 @@ impl App {
                 // if necessary, scale down image
                 if reduced_monitor_width > image_width && reduced_monitor_height > image_height {
                     // set window to exact size
-                    root.set_default_size(image_width as i32, image_height as i32);
+                    root.set_default_size(image_width as i32, (image_height + toolbars_height) as i32);
                 } else {
                     // scale down and use windowed mode
                     let aspect_ratio = image_width / image_height;
@@ -154,14 +162,14 @@ impl App {
                         new_width = new_height * aspect_ratio;
                     }
 
-                    root.set_default_size(new_width as i32, new_height as i32);
+                    root.set_default_size(new_width as i32, (new_height + toolbars_height) as i32);
                 }
             }
             Some(Resize::Size { width, height }) => {
                 root.set_default_size(width, height);
             }
             _ => {
-                root.set_default_size(image_width as i32, image_height as i32);
+                root.set_default_size(image_width as i32, (image_height + toolbars_height) as i32);
             }
         }
 
