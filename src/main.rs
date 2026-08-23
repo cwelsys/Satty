@@ -69,7 +69,11 @@ struct App {
     sketch_board: Controller<SketchBoard>,
     tools_toolbar: Controller<ToolsToolbar>,
     style_toolbar: Controller<StyleToolbar>,
-    outer_box: gtk::Box,
+    // The toolbars are centred, so in windowed mode they leave a strip of bare
+    // background either side. Holding them in a WindowHandle turns that strip
+    // into a drag surface for the window.
+    tools_handle: gtk::WindowHandle,
+    style_handle: gtk::WindowHandle,
     overlay: gtk::Overlay,
 }
 
@@ -250,13 +254,15 @@ impl Component for App {
             #[local_ref]
             outer_box_clone -> gtk::Box {
                 add_css_class: "outer_box",
-                append = model.tools_toolbar.widget(),
+                #[local_ref]
+                tools_handle_clone -> gtk::WindowHandle {},
                 #[local_ref]
                 overlay_clone -> gtk::Overlay {
                     add_css_class: "overlay",
                     model.sketch_board.widget(),
                 },
-                append = model.style_toolbar.widget(),
+                #[local_ref]
+                style_handle_clone -> gtk::WindowHandle {},
             },
 
             connect_show[sender] => move |_| {
@@ -335,15 +341,18 @@ impl Component for App {
                 let tools = self.tools_toolbar.widget();
                 let style = self.style_toolbar.widget();
                 if fullscreen {
-                    self.outer_box.remove(tools);
-                    self.outer_box.remove(style);
+                    // Float the toolbars over the canvas. The emptied handles
+                    // measure zero, so they leave no strip behind, and the
+                    // canvas stays drawable either side of the toolbars.
+                    self.tools_handle.set_child(None::<&gtk::Widget>);
+                    self.style_handle.set_child(None::<&gtk::Widget>);
                     self.overlay.add_overlay(tools);
                     self.overlay.add_overlay(style);
                 } else {
                     self.overlay.remove_overlay(tools);
                     self.overlay.remove_overlay(style);
-                    self.outer_box.prepend(tools);
-                    self.outer_box.append(style);
+                    self.tools_handle.set_child(Some(tools));
+                    self.style_handle.set_child(Some(style));
                 }
             }
             AppInput::DimensionsUpdate(dimensions) => {
@@ -425,13 +434,22 @@ impl Component for App {
         let overlay = gtk::Overlay::new();
         let overlay_clone = overlay.clone();
 
+        let tools_handle = gtk::WindowHandle::new();
+        tools_handle.set_child(Some(tools_toolbar.widget()));
+        let tools_handle_clone = tools_handle.clone();
+
+        let style_handle = gtk::WindowHandle::new();
+        style_handle.set_child(Some(style_toolbar.widget()));
+        let style_handle_clone = style_handle.clone();
+
         // Model
         let model = App {
             sketch_board,
             tools_toolbar,
             style_toolbar,
             image_dimensions,
-            outer_box,
+            tools_handle,
+            style_handle,
             overlay,
         };
 
